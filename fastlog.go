@@ -1,3 +1,25 @@
+// fastlog - A high-performance logging package for Go.
+//
+// Copyright (c) 2024 AMAR SINGH RATHOUR
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 package fastlog
 
 import (
@@ -63,7 +85,7 @@ type logEntry struct {
 func NewLogger(config LoggerConfig) (*Logger, error) {
 	var writer io.Writer
 	var err error
-	
+
 	// Determine the writer based on config.
 	if config.Stdout {
 		writer = os.Stdout
@@ -73,7 +95,7 @@ func NewLogger(config LoggerConfig) (*Logger, error) {
 			return nil, fmt.Errorf("failed to open log file: %w", err)
 		}
 	}
-	
+
 	// Initialize the Logger.
 	logger := &Logger{
 		level:        config.Level,
@@ -86,11 +108,11 @@ func NewLogger(config LoggerConfig) (*Logger, error) {
 		stdout:       config.Stdout,
 		jsonFormat:   config.JSONFormat,
 	}
-	
+
 	// Start background goroutines for processing log queue and periodic buffer flush.
 	go logger.processQueue()
 	go logger.periodicFlush()
-	
+
 	return logger, nil
 }
 
@@ -99,10 +121,10 @@ func (l *Logger) log(level LogLevel, args ...interface{}) {
 	if level < l.level {
 		return
 	}
-	
+
 	timestamp := time.Now().Format(time.RFC3339)
 	levelStr := [...]string{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"}[level]
-	
+
 	var logMessage string
 	if l.jsonFormat {
 		entry := logEntry{
@@ -120,7 +142,7 @@ func (l *Logger) log(level LogLevel, args ...interface{}) {
 		message := fmt.Sprint(args...)
 		logMessage = fmt.Sprintf("%s [%s] %s\n", timestamp, levelStr, message)
 	}
-	
+
 	l.queue <- logMessage
 }
 
@@ -189,18 +211,18 @@ func (l *Logger) rotateLogFile() error {
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("failed to close log file during rotation: %w", err)
 	}
-	
+
 	timestamp := time.Now().Format("20060102-150405")
 	newLogFileName := fmt.Sprintf("%s/%s-%s.log", l.rotationDir, l.baseFileName, timestamp)
 	if err := os.Rename(l.baseFileName, newLogFileName); err != nil {
 		return fmt.Errorf("failed to rename log file during rotation: %w", err)
 	}
-	
+
 	newFile, err := os.OpenFile(l.baseFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open new log file during rotation: %w", err)
 	}
-	
+
 	l.writer = newFile
 	l.buffer = bufio.NewWriterSize(newFile, bufferSize)
 	return nil

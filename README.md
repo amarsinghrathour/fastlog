@@ -77,3 +77,5 @@ Here's an example of how to use fastlog:
 
 
 ```
+
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
