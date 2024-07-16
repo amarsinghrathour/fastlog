@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -42,6 +43,12 @@ const (
 	WARN                  // Warn level for warnings about potential issues.
 	ERROR                 // Error level for error messages indicating problems.
 	FATAL                 // Fatal level for critical issues that require program exit.
+)
+
+// Constants for retry mechanism
+const (
+	retryInterval = 100 * time.Millisecond // Interval between retries
+	maxRetries    = 5                      // Maximum number of retries
 )
 
 // Constants for buffer size, flush interval, and max log file size.
@@ -72,6 +79,7 @@ type Logger struct {
 	baseFileName string        // Base file name for log rotation.
 	stdout       bool          // Flag indicating if logs are written to stdout.
 	jsonFormat   bool          // Flag indicating if logs are in JSON format.
+	file         *os.File      // File handle for log file.
 }
 
 // logEntry defines the structure of a log entry when JSONFormat is enabled.
@@ -85,15 +93,23 @@ type logEntry struct {
 func NewLogger(config LoggerConfig) (*Logger, error) {
 	var writer io.Writer
 	var err error
-
+	var file *os.File
+	// Ensure the log directory exists
+	if !config.Stdout {
+		logDir := filepath.Dir(config.FilePath)
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create log directory: %w", err)
+		}
+	}
 	// Determine the writer based on config.
 	if config.Stdout {
 		writer = os.Stdout
 	} else {
-		writer, err = os.OpenFile(config.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(config.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open log file: %w", err)
 		}
+		writer = file
 	}
 
 	// Initialize the Logger.
@@ -107,6 +123,7 @@ func NewLogger(config LoggerConfig) (*Logger, error) {
 		baseFileName: config.FilePath,
 		stdout:       config.Stdout,
 		jsonFormat:   config.JSONFormat,
+		file:         file,
 	}
 
 	// Start background goroutines for processing log queue and periodic buffer flush.
@@ -143,7 +160,21 @@ func (l *Logger) log(level LogLevel, args ...interface{}) {
 		logMessage = fmt.Sprintf("%s [%s] %s\n", timestamp, levelStr, message)
 	}
 
-	l.queue <- logMessage
+	// Push log message to queue with retry mechanism
+	for retries := 0; retries < maxRetries; retries++ {
+		select {
+		case l.queue <- logMessage:
+			// Log message enqueued successfully
+			return
+		default:
+			// Queue is full, wait for retry interval
+			time.Sleep(retryInterval)
+		}
+	}
+
+	// If all retries failed, log to stderr
+	fmt.Fprintf(os.Stderr, "logger queue full, dropping log message after %d retries: %s\n", maxRetries, logMessage)
+
 }
 
 // processQueue handles log messages from the queue and writes them to the buffer.
@@ -151,16 +182,25 @@ func (l *Logger) processQueue() {
 	for {
 		select {
 		case logMessage := <-l.queue:
-			l.mu.Lock()
-			if !l.stdout && l.logFileSizeExceeded() {
-				if err := l.rotateLogFile(); err != nil {
-					fmt.Fprintf(os.Stderr, "failed to rotate log file: %v\n", err)
+			func() {
+				l.mu.Lock()
+				defer l.mu.Unlock()
+				fileLimit := l.logFileSizeExceeded()
+				if !l.stdout && l.file != nil && fileLimit {
+					if err := l.rotateLogFile(); err != nil {
+						fmt.Fprintf(os.Stderr, "failed to rotate log file: %v\n", err)
+					}
 				}
-			}
-			if _, err := l.buffer.WriteString(logMessage); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to write log message: %v\n", err)
-			}
-			l.mu.Unlock()
+				if l.file != nil {
+					// Ensure file is still open
+					if _, err := l.buffer.WriteString(logMessage); err != nil {
+						fmt.Fprintf(os.Stderr, "failed to write log message: %v\n", err)
+					}
+					if err := l.buffer.Flush(); err != nil {
+						fmt.Fprintf(os.Stderr, "failed to flush buffer: %v\n", err)
+					}
+				}
+			}()
 		case <-l.done:
 			return
 		}
@@ -170,6 +210,8 @@ func (l *Logger) processQueue() {
 // periodicFlush periodically flushes the buffer to ensure logs are written to the file.
 func (l *Logger) periodicFlush() {
 	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ticker.C:
@@ -179,7 +221,6 @@ func (l *Logger) periodicFlush() {
 			}
 			l.mu.Unlock()
 		case <-l.done:
-			ticker.Stop()
 			return
 		}
 	}
@@ -187,11 +228,10 @@ func (l *Logger) periodicFlush() {
 
 // logFileSizeExceeded checks if the current log file size exceeds the maximum limit.
 func (l *Logger) logFileSizeExceeded() bool {
-	file, ok := l.writer.(*os.File)
-	if !ok {
+	if l.file == nil {
 		return false
 	}
-	stat, err := file.Stat()
+	stat, err := l.file.Stat()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to stat log file: %v\n", err)
 		return false
@@ -201,46 +241,68 @@ func (l *Logger) logFileSizeExceeded() bool {
 
 // rotateLogFile handles log file rotation when the log file size exceeds the limit.
 func (l *Logger) rotateLogFile() error {
-	file, ok := l.writer.(*os.File)
-	if !ok {
-		return fmt.Errorf("writer is not a file")
+
+	if l.stdout {
+		return nil
 	}
+	// Flush buffer before rotation
 	if err := l.buffer.Flush(); err != nil {
 		return fmt.Errorf("failed to flush buffer during rotation: %w", err)
 	}
-	if err := file.Close(); err != nil {
-		return fmt.Errorf("failed to close log file during rotation: %w", err)
-	}
 
+	// Close current log file if open
+	if l.file != nil {
+		if err := l.file.Close(); err != nil {
+			return fmt.Errorf("failed to close log file during rotation: %w", err)
+		}
+		l.file = nil
+	}
+	// Ensure the rotation directory exists
+	if err := os.MkdirAll(l.rotationDir, 0755); err != nil {
+		return fmt.Errorf("failed to create rotation directory: %w", err)
+	}
+	// Generate new log file name with timestamp
 	timestamp := time.Now().Format("20060102-150405")
-	newLogFileName := fmt.Sprintf("%s/%s-%s.log", l.rotationDir, l.baseFileName, timestamp)
-	if err := os.Rename(l.baseFileName, newLogFileName); err != nil {
-		return fmt.Errorf("failed to rename log file during rotation: %w", err)
-	}
+	newLogFileName := fmt.Sprintf("%s/%s-%s.log", l.rotationDir, filepath.Base(l.baseFileName), timestamp)
 
-	newFile, err := os.OpenFile(l.baseFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// Open new log file for writing
+	newFile, err := os.OpenFile(newLogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open new log file during rotation: %w", err)
 	}
 
+	// Update logger state with new file and reset buffer
+	l.file = newFile
 	l.writer = newFile
-	l.buffer = bufio.NewWriterSize(newFile, bufferSize)
+	l.buffer.Reset(newFile)
+
 	return nil
 }
 
 // Close flushes the buffer and closes the log file.
 func (l *Logger) Close() {
-	close(l.done)
 	l.mu.Lock()
 	defer l.mu.Unlock()
+
+	// Ensure the done channel is closed once
+	select {
+	case <-l.done:
+		// already closed
+	default:
+		close(l.done)
+	}
+
+	// Flush buffer before closing
 	if err := l.buffer.Flush(); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to flush buffer during close: %v\n", err)
 	}
-	file, ok := l.writer.(*os.File)
-	if ok && !l.stdout {
-		if err := file.Close(); err != nil {
+
+	// Close log file if not in stdout mode and file is open
+	if !l.stdout && l.file != nil {
+		if err := l.file.Close(); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to close log file: %v\n", err)
 		}
+		l.file = nil // Ensure file reference is cleared
 	}
 }
 
@@ -267,6 +329,6 @@ func (l *Logger) Error(args ...interface{}) {
 // Fatal logs a message at the FATAL level and exits the application.
 func (l *Logger) Fatal(args ...interface{}) {
 	l.log(FATAL, args...)
-	l.Close()
+	l.Close() // Ensure log file is closed before exiting
 	os.Exit(1)
 }
