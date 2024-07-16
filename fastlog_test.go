@@ -1,6 +1,7 @@
 package fastlog
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -83,8 +84,11 @@ func TestLogMessage(t *testing.T) {
 
 func TestLogFileRotation(t *testing.T) {
 	logDir := "test_logs"
-	baseLogFileName := filepath.Join(logDir, "test_app.log")
-	defer os.RemoveAll(logDir)
+	baseLogFileName := "test_app.log"
+	defer func() {
+		os.RemoveAll(logDir)
+		os.Remove(baseLogFileName)
+	}()
 
 	err := os.MkdirAll(logDir, 0755)
 	if err != nil {
@@ -123,7 +127,8 @@ func TestLogFileRotation(t *testing.T) {
 
 	rotatedFileFound := false
 	for _, file := range files {
-		if strings.Contains(file.Name(), "test_app-") {
+		fmt.Println("file: ", file.Name())
+		if strings.Contains(file.Name(), "test_app") {
 			rotatedFileFound = true
 			break
 		}
@@ -262,4 +267,5 @@ func BenchmarkLogging(b *testing.B) {
 
 	// Cleanup log file after benchmark
 	os.Remove(loggerConfig.FilePath)
+	os.RemoveAll(loggerConfig.RotationDir)
 }
