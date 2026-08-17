@@ -2,7 +2,7 @@ package fastlog
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,7 +13,7 @@ import (
 // Helper function to create a temporary log file for testing
 func createTempLogFile(t *testing.T) (*os.File, string) {
 	t.Helper()
-	tmpfile, err := ioutil.TempFile("", "logfile-*.log")
+	tmpfile, err := os.CreateTemp("", "logfile-*.log")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestLogMessage(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // Give some time for the logger to process the queue
 
-	content, err := ioutil.ReadFile(logfilePath)
+	content, err := os.ReadFile(logfilePath)
 	if err != nil {
 		t.Fatalf("Failed to read log file: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestJSONLogFormat(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // Give some time for the logger to process the queue
 
-	content, err := ioutil.ReadFile(logfilePath)
+	content, err := os.ReadFile(logfilePath)
 	if err != nil {
 		t.Fatalf("Failed to read log file: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestLogToStdout(t *testing.T) {
 
 	// Capture output from the pipe
 	w.Close()
-	logOutput, _ := ioutil.ReadAll(r)
+	logOutput, _ := io.ReadAll(r)
 
 	// Check the captured output
 	expectedLog := "[INFO] This is an info message to stdout"
