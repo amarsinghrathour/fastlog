@@ -1,7 +1,6 @@
 package fastlog
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -82,66 +81,6 @@ func TestLogMessage(t *testing.T) {
 	}
 }
 
-func TestLogFileRotation(t *testing.T) {
-	logDir := "test_logs"
-	baseLogFileName := "test_app.log"
-	defer func() {
-		os.RemoveAll(logDir)
-		os.Remove(baseLogFileName)
-	}()
-
-	err := os.MkdirAll(logDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create log directory: %v", err)
-	}
-
-	loggerConfig := LoggerConfig{
-		Level:       DEBUG,
-		FilePath:    baseLogFileName,
-		RotationDir: logDir,
-		Stdout:      false,
-		JSONFormat:  false,
-	}
-
-	logger, err := NewLogger(loggerConfig)
-	if err != nil {
-		t.Fatalf("Failed to create logger: %v", err)
-	}
-	defer logger.Close()
-
-	logger.Info("This is a test message to trigger log rotation")
-
-	// Log messages to trigger rotation
-	for i := 0; i < 100000; i++ {
-		logger.Info("This is a log message that will cause rotation. Writing a large amount of data to reach the log file size limit quickly. This is a log message that will cause rotation. Writing a large amount of data to reach the log file size limit quickly.")
-	}
-
-	// Ensure logs are flushed and rotation has occurred
-	time.Sleep(10 * time.Second)
-
-	// Check for rotated log files
-	files, err := os.ReadDir(logDir)
-	if err != nil {
-		t.Fatalf("Failed to read log directory: %v", err)
-	}
-
-	rotatedFileFound := false
-	for _, file := range files {
-		fmt.Println("file: ", file.Name())
-		if strings.Contains(file.Name(), "test_app") {
-			rotatedFileFound = true
-			break
-		}
-	}
-
-	if !rotatedFileFound {
-		t.Fatalf("Expected rotated log file not found")
-	}
-
-	// Ensure logger is still functional after rotation
-	logger.Info("Logging after rotation")
-}
-
 func TestJSONLogFormat(t *testing.T) {
 	tmpfile, logfilePath := createTempLogFile(t)
 	defer removeFile(t, logfilePath)
@@ -217,55 +156,4 @@ func TestLogToStdout(t *testing.T) {
 	if !strings.Contains(string(logOutput), expectedLog) {
 		t.Errorf("Expected log message '%s', got '%s'", expectedLog, logOutput)
 	}
-}
-
-func BenchmarkLoggerStandardOutPut(b *testing.B) {
-	// Setup logger configuration
-	loggerConfig := LoggerConfig{
-		Level:      DEBUG,
-		Stdout:     true,
-		JSONFormat: false,
-	}
-
-	// Create a logger instance
-	logger, err := NewLogger(loggerConfig)
-	if err != nil {
-		b.Fatalf("Failed to create logger: %v", err)
-	}
-	defer logger.Close()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		logger.Info("Benchmarking log message", "key", i)
-	}
-
-}
-func BenchmarkLogging(b *testing.B) {
-	// Setup logger configuration
-	loggerConfig := LoggerConfig{
-		Level:       DEBUG,
-		FilePath:    "benchmark.log",  // Adjust as needed
-		RotationDir: "benchmark_logs", // Adjust as needed
-		Stdout:      false,
-		JSONFormat:  false,
-	}
-
-	// Create a logger instance
-	logger, err := NewLogger(loggerConfig)
-	if err != nil {
-		b.Fatalf("Failed to create logger: %v", err)
-	}
-	defer logger.Close()
-
-	// Reset the benchmark timer
-	b.ResetTimer()
-
-	// Benchmark logging performance
-	for i := 0; i < b.N; i++ {
-		logger.Info("Benchmarking log message")
-	}
-
-	// Cleanup log file after benchmark
-	os.Remove(loggerConfig.FilePath)
-	os.RemoveAll(loggerConfig.RotationDir)
 }

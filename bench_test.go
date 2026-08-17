@@ -2,6 +2,7 @@ package fastlog
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -65,11 +66,11 @@ func BenchmarkFastlogInfoWithFields(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			logger.WithFields(map[string]interface{}{
-				"user_id":    123,
-				"request_id": "abc-123",
-				"status":     "ok",
-			}).Info("test message")
+			logger.WithFields(
+				Int("user_id", 123),
+				String("request_id", "abc-123"),
+				String("status", "ok"),
+			).Info("test message")
 		}
 	})
 }
@@ -181,10 +182,10 @@ func BenchmarkFastlogJSONAllocations(b *testing.B) {
 // BenchmarkFastlogWithCaller benchmarks logging with caller information
 func BenchmarkFastlogWithCaller(b *testing.B) {
 	logger, err := NewLogger(LoggerConfig{
-		Level:       INFO,
-		Stdout:      false,
-		JSONFormat:  false,
-		FilePath:    "/dev/null",
+		Level:        INFO,
+		Stdout:       false,
+		JSONFormat:   false,
+		FilePath:     "/dev/null",
 		EnableCaller: true,
 	})
 	if err != nil {
@@ -243,8 +244,8 @@ func BenchmarkFastlogFile(b *testing.B) {
 		Stdout:      false,
 		JSONFormat:  false,
 		FilePath:    tmpFile.Name(),
-		RotationDir: "", // Disable rotation for benchmark
-		MaxFileSize: 0,  // Disable rotation
+		RotationDir: filepath.Dir(tmpFile.Name()),
+		MaxFileSize: 1 << 62, // Avoid rotation during benchmark runs
 	})
 	if err != nil {
 		b.Fatalf("Failed to create logger: %v", err)
@@ -332,23 +333,23 @@ func BenchmarkFastlogManyFields(b *testing.B) {
 	}
 	defer logger.Close()
 
-	fields := map[string]interface{}{
-		"field1":  "value1",
-		"field2":  123,
-		"field3":  true,
-		"field4":  45.67,
-		"field5":  "value5",
-		"field6":  789,
-		"field7":  false,
-		"field8":  12.34,
-		"field9":  "value9",
-		"field10": 101112,
+	fields := []Field{
+		String("field1", "value1"),
+		Int("field2", 123),
+		Bool("field3", true),
+		Float64("field4", 45.67),
+		String("field5", "value5"),
+		Int("field6", 789),
+		Bool("field7", false),
+		Float64("field8", 12.34),
+		String("field9", "value9"),
+		Int("field10", 101112),
 	}
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			logger.WithFields(fields).Info("test message")
+			logger.WithFields(fields...).Info("test message")
 		}
 	})
 }
@@ -481,16 +482,16 @@ func BenchmarkFastlog_WithFields_3(b *testing.B) {
 	}
 	defer logger.Close()
 
-	fields := map[string]interface{}{
-		"user_id":    123,
-		"request_id": "abc-123",
-		"status":     "ok",
+	fields := []Field{
+		Int("user_id", 123),
+		String("request_id", "abc-123"),
+		String("status", "ok"),
 	}
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			logger.WithFields(fields).Info("test message")
+			logger.WithFields(fields...).Info("test message")
 		}
 	})
 }
@@ -508,23 +509,23 @@ func BenchmarkFastlog_WithFields_10(b *testing.B) {
 	}
 	defer logger.Close()
 
-	fields := map[string]interface{}{
-		"field1":  "value1",
-		"field2":  123,
-		"field3":  true,
-		"field4":  45.67,
-		"field5":  "value5",
-		"field6":  789,
-		"field7":  false,
-		"field8":  12.34,
-		"field9":  "value9",
-		"field10": 101112,
+	fields := []Field{
+		String("field1", "value1"),
+		Int("field2", 123),
+		Bool("field3", true),
+		Float64("field4", 45.67),
+		String("field5", "value5"),
+		Int("field6", 789),
+		Bool("field7", false),
+		Float64("field8", 12.34),
+		String("field9", "value9"),
+		Int("field10", 101112),
 	}
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			logger.WithFields(fields).Info("test message")
+			logger.WithFields(fields...).Info("test message")
 		}
 	})
 }

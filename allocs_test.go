@@ -48,9 +48,7 @@ func TestDisabledLogging_ZeroAllocations_WithFields(t *testing.T) {
 	defer logger.Close()
 
 	allocs := testing.AllocsPerRun(1000, func() {
-		logger.WithFields(map[string]interface{}{
-			"key": "value",
-		}).Info("test message")
+		logger.WithFields(String("key", "value")).Info("test message")
 	})
 
 	// WithFields creates fieldLogger + map, but level check prevents formatting
@@ -63,11 +61,11 @@ func TestDisabledLogging_ZeroAllocations_WithFields(t *testing.T) {
 // TestEnabledLogging_SimpleMessage_Allocations verifies simple enabled messages have minimal allocations
 func TestEnabledLogging_SimpleMessage_Allocations(t *testing.T) {
 	logger, err := NewLogger(LoggerConfig{
-		Level:      DEBUG,
-		Stdout:     false,
-		JSONFormat: false,
-		FilePath:   "/dev/null",
-		SyncMode:   true,
+		Level:        DEBUG,
+		Stdout:       false,
+		JSONFormat:   false,
+		FilePath:     "/dev/null",
+		SyncMode:     true,
 		EnableCaller: false, // Disable caller for simple message test
 	})
 	if err != nil {
@@ -89,11 +87,11 @@ func TestEnabledLogging_SimpleMessage_Allocations(t *testing.T) {
 // TestEnabledLogging_WithFields_Allocations verifies logging with fields has minimal allocations
 func TestEnabledLogging_WithFields_Allocations(t *testing.T) {
 	logger, err := NewLogger(LoggerConfig{
-		Level:      DEBUG,
-		Stdout:     false,
-		JSONFormat: true, // JSON for fields
-		FilePath:   "/dev/null",
-		SyncMode:   true,
+		Level:        DEBUG,
+		Stdout:       false,
+		JSONFormat:   true, // JSON for fields
+		FilePath:     "/dev/null",
+		SyncMode:     true,
 		EnableCaller: false,
 	})
 	if err != nil {
@@ -102,10 +100,10 @@ func TestEnabledLogging_WithFields_Allocations(t *testing.T) {
 	defer logger.Close()
 
 	allocs := testing.AllocsPerRun(1000, func() {
-		logger.WithFields(map[string]interface{}{
-			"user_id": 123,
-			"status":  "ok",
-		}).Info("test message")
+		logger.WithFields(
+			Int("user_id", 123),
+			String("status", "ok"),
+		).Info("test message")
 	})
 
 	// Contract: JSON with fields will have more allocs due to json.Marshal
@@ -140,11 +138,11 @@ func BenchmarkDisabledLogging_Allocations(b *testing.B) {
 // BenchmarkEnabledLogging_Simple_Allocations benchmarks simple enabled logging allocations
 func BenchmarkEnabledLogging_Simple_Allocations(b *testing.B) {
 	logger, err := NewLogger(LoggerConfig{
-		Level:       DEBUG,
-		Stdout:      false,
-		JSONFormat:  false,
-		FilePath:    "/dev/null",
-		SyncMode:    true,
+		Level:        DEBUG,
+		Stdout:       false,
+		JSONFormat:   false,
+		FilePath:     "/dev/null",
+		SyncMode:     true,
 		EnableCaller: false,
 	})
 	if err != nil {

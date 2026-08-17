@@ -215,11 +215,11 @@ func BenchmarkComparisonFastlogWithFields(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			logger.WithFields(map[string]interface{}{
-				"user_id":    123,
-				"request_id": "abc-123",
-				"status":     "ok",
-			}).Info("test message")
+			logger.WithFields(
+				Int("user_id", 123),
+				String("request_id", "abc-123"),
+				String("status", "ok"),
+			).Info("test message")
 		}
 	})
 }
@@ -241,11 +241,11 @@ func BenchmarkComparisonFastlogWithFieldsSync(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			logger.WithFields(map[string]interface{}{
-				"user_id":    123,
-				"request_id": "abc-123",
-				"status":     "ok",
-			}).Info("test message")
+			logger.WithFields(
+				Int("user_id", 123),
+				String("request_id", "abc-123"),
+				String("status", "ok"),
+			).Info("test message")
 		}
 	})
 }
