@@ -16,12 +16,7 @@ const (
 	DefaultQueueSize      = 1000             // Default queue size for log messages.
 )
 
-// Deprecated: Use DefaultBufferSize instead.
-const (
-	bufferSize     = DefaultBufferSize
-	flushInterval  = DefaultFlushInterval
-	maxLogFileSize = DefaultMaxLogFileSize
-)
+
 
 // LoggerConfig defines the configuration for the Logger.
 type LoggerConfig struct {

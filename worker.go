@@ -81,13 +81,13 @@ func (l *Logger) flushBatch(batch []*entry) {
 
 			jsonBytes := l.formatJSONMessage(e)
 			if jsonBytes != nil {
-				l.buffer.Write(jsonBytes)
-				l.buffer.WriteByte('\n')
+				_, _ = l.buffer.Write(jsonBytes)
+				_ = l.buffer.WriteByte('\n')
 			}
 		} else {
 			msgBytes := l.formatTextMessage(e)
 			if msgBytes != nil {
-				l.buffer.Write(msgBytes)
+				_, _ = l.buffer.Write(msgBytes)
 			}
 		}
 
@@ -115,14 +115,14 @@ func (l *Logger) writeLogMessageSyncOptimized(e *entry) {
 
 			jsonBytes := l.formatJSONMessage(e)
 			if jsonBytes != nil {
-				l.buffer.Write(jsonBytes)
-				l.buffer.WriteByte('\n')
+				_, _ = l.buffer.Write(jsonBytes)
+				_ = l.buffer.WriteByte('\n')
 			}
 		} else {
 
 			msgBytes := l.formatTextMessage(e)
 			if msgBytes != nil {
-				l.buffer.Write(msgBytes)
+				_, _ = l.buffer.Write(msgBytes)
 			}
 		}
 

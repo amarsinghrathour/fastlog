@@ -529,7 +529,7 @@ func (l *Logger) Fatalf(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
-// // WithFields creates a new logger instance with the specified fields that will be included
+// WithFields creates a new logger instance with the specified fields that will be included
 // in all subsequent log messages created by this logger.
 //
 // Parameters:

@@ -30,7 +30,7 @@ func removeFile(t *testing.T, filepath string) {
 func TestNewLogger(t *testing.T) {
 	tmpfile, logfilePath := createTempLogFile(t)
 	defer removeFile(t, logfilePath)
-	defer tmpfile.Close()
+	defer func() { _ = tmpfile.Close() }()
 
 	loggerConfig := LoggerConfig{
 		Level:       DEBUG,
@@ -50,7 +50,7 @@ func TestNewLogger(t *testing.T) {
 func TestLogMessage(t *testing.T) {
 	tmpfile, logfilePath := createTempLogFile(t)
 	defer removeFile(t, logfilePath)
-	defer tmpfile.Close()
+	defer func() { _ = tmpfile.Close() }()
 
 	loggerConfig := LoggerConfig{
 		Level:       DEBUG,
@@ -84,7 +84,7 @@ func TestLogMessage(t *testing.T) {
 func TestJSONLogFormat(t *testing.T) {
 	tmpfile, logfilePath := createTempLogFile(t)
 	defer removeFile(t, logfilePath)
-	defer tmpfile.Close()
+	defer func() { _ = tmpfile.Close() }()
 
 	loggerConfig := LoggerConfig{
 		Level:       DEBUG,
@@ -118,8 +118,8 @@ func TestJSONLogFormat(t *testing.T) {
 func TestLogToStdout(t *testing.T) {
 	// Create a pipe to capture stdout
 	r, w, _ := os.Pipe()
-	defer r.Close()
-	defer w.Close()
+	defer func() { _ = r.Close() }()
+	defer func() { _ = w.Close() }()
 
 	// Redirect stdout to the pipe
 	old := os.Stdout
@@ -148,7 +148,7 @@ func TestLogToStdout(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Capture output from the pipe
-	w.Close()
+	_ = w.Close()
 	logOutput, _ := io.ReadAll(r)
 
 	// Check the captured output

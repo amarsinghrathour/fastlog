@@ -209,7 +209,7 @@ func BenchmarkFastlogStdout(b *testing.B) {
 	os.Stdout = devNull
 	defer func() {
 		os.Stdout = oldStdout
-		devNull.Close()
+		_ = devNull.Close()
 	}()
 
 	logger, err := NewLogger(LoggerConfig{
@@ -236,8 +236,8 @@ func BenchmarkFastlogFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	defer func() { _ = tmpFile.Close() }()
 
 	logger, err := NewLogger(LoggerConfig{
 		Level:       INFO,

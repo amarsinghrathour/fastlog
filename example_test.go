@@ -12,7 +12,7 @@ func ExampleNewLogger() {
 	if err != nil {
 		panic(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	logger, err := fastlog.NewLogger(fastlog.LoggerConfig{
 		Level:       fastlog.INFO,
